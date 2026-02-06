@@ -69,6 +69,12 @@ def handle_request():
                 response_format=DiagramResponse,
             )
 
+            # Check if parsing was successful
+            if not completion.choices or not completion.choices[0].message.parsed:
+                return jsonify({
+                    "error": "AI did not generate a valid response. Please try again."
+                }), 500
+
             result = completion.choices[0].message.parsed
             
             # Validate that we got valid PlantUML code
@@ -92,7 +98,14 @@ def handle_request():
         except Exception as openai_error:
             # Handle OpenAI-specific errors more gracefully
             error_msg = str(openai_error)
-            if "did not match the expected pattern" in error_msg or "validation" in error_msg.lower():
+            error_type = type(openai_error).__name__
+            
+            # Check for validation/pattern matching errors in multiple ways
+            if ("did not match the expected pattern" in error_msg or 
+                "validation" in error_msg.lower() or
+                "pattern" in error_msg.lower() or
+                "ValidationError" in error_type or
+                "InvalidResponseFormat" in error_type):
                 return jsonify({
                     "error": "AI generated invalid PlantUML code. Please try rephrasing your request or try again."
                 }), 500
@@ -105,8 +118,9 @@ def handle_request():
                     "error": "OpenAI API authentication failed. Please check your API key configuration."
                 }), 500
             else:
+                # Return a more user-friendly message, but include error type for debugging
                 return jsonify({
-                    "error": f"OpenAI API error: {error_msg}"
+                    "error": f"AI generation failed. Please try again. (Error: {error_type})"
                 }), 500
 
     except Exception as e:
