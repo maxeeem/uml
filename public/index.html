@@ -67,7 +67,15 @@
 
                 displayResult(data);
             } catch (err) {
-                resultDiv.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+                console.error("Generation error:", err);
+                resultDiv.innerHTML = `
+                    <p class="error">
+                        <strong>Error:</strong> ${err.message}<br>
+                        <small style="opacity: 0.8; display: block; margin-top: 5px;">
+                            See browser console for more details.
+                        </small>
+                    </p>
+                `;
             } finally {
                 btn.disabled = false;
                 btn.innerText = "Generate";

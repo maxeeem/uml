@@ -23,9 +23,17 @@ api_bp = Blueprint('api', __name__)
 
 # Initialize OpenAI
 api_key = os.environ.get("OPENAI_API_KEY")
-if api_key:
-    api_key = api_key.strip()  # Remove any whitespace/newlines
-client = OpenAI(api_key=api_key)
+if not api_key:
+    print("Warning: OPENAI_API_KEY is not set in environment variables")
+else:
+    api_key = api_key.strip()
+    print(f"OpenAI API Key loaded (length: {len(api_key)})")
+
+try:
+    client = OpenAI(api_key=api_key)
+except Exception as e:
+    print(f"Error initializing OpenAI client: {e}")
+    client = None
 
 # Get the secret password from Vercel Environment Variables or .env file
 # For localhost: set this to None or empty string to disable access code check
@@ -71,6 +79,9 @@ def handle_request():
 
         # Call OpenAI with Structured Outputs
         try:
+            if not client:
+                 return jsonify({"error": "Server configuration error: OpenAI API Key is missing or invalid. Please check Vercel environment variables."}), 500
+
             completion = client.beta.chat.completions.parse(
                 model="gpt-4o-mini",
                 messages=[
@@ -104,67 +115,41 @@ def handle_request():
         except (ValidationError, ValueError) as validation_error:
             # Handle Pydantic validation errors (when OpenAI response doesn't match schema)
             return jsonify({
-                "error": "AI generated invalid PlantUML code that doesn't match the expected format. Please try rephrasing your request or try again."
+                "error": f"AI generated invalid data structure: {str(validation_error)}"
             }), 500
         except APIError as api_error:
             # Handle OpenAI API errors
             error_msg = str(api_error)
-            if "did not match the expected pattern" in error_msg or "validation" in error_msg.lower() or "pattern" in error_msg.lower():
-                return jsonify({
-                    "error": "AI generated invalid PlantUML code. Please try rephrasing your request or try again."
+            print(f"OpenAI API Error: {error_msg}")
+            
+            # Check for specific "match the expected pattern" error which often indicates encoding issues
+            if "did not match the expected pattern" in error_msg:
+                 return jsonify({
+                    "error": f"Encoding error detected (The string did not match the expected pattern). This often happens if the API Key contains invalid characters. Please check your OPENAI_API_KEY in Vercel settings. Details: {error_msg}"
                 }), 500
-            else:
-                return jsonify({
-                    "error": f"OpenAI API error: {error_msg}"
-                }), 500
+                
+            return jsonify({
+                "error": f"OpenAI API error: {error_msg}"
+            }), 500
         except Exception as openai_error:
             # Handle OpenAI-specific errors more gracefully
             error_msg = str(openai_error)
             error_type = type(openai_error).__name__
+            print(f"OpenAI Unexpected Error: {error_type} - {error_msg}")
             
-            # Check for validation/pattern matching errors in multiple ways
-            if ("did not match the expected pattern" in error_msg or 
-                "validation" in error_msg.lower() or
-                "pattern" in error_msg.lower() or
-                "ValidationError" in error_type or
-                "InvalidResponseFormat" in error_type):
-                return jsonify({
-                    "error": "AI generated invalid PlantUML code. Please try rephrasing your request or try again."
-                }), 500
-            elif "rate limit" in error_msg.lower():
-                return jsonify({
-                    "error": "OpenAI API rate limit exceeded. Please wait a moment and try again."
-                }), 429
-            elif "api key" in error_msg.lower() or "authentication" in error_msg.lower():
-                return jsonify({
-                    "error": "OpenAI API authentication failed. Please check your API key configuration."
-                }), 500
-            else:
-                # Return a more user-friendly message, but include error type for debugging
-                return jsonify({
-                    "error": f"AI generation failed. Please try again. (Error: {error_type})"
-                }), 500
+            return jsonify({
+                "error": f"AI generation failed (OpenAI Error): {error_type}: {error_msg}"
+            }), 500
 
     except Exception as e:
         # Handle other errors (access code, missing prompt, or any uncaught API/validation errors)
         error_msg = str(e)
-        error_msg_lower = error_msg.lower()
         error_type = type(e).__name__
+        print(f"General Error: {error_type} - {error_msg}")
+        import traceback
+        traceback.print_exc()
 
-        # Never expose raw validation/pattern errors to the client
-        if ("did not match the expected pattern" in error_msg_lower or
-            ("pattern" in error_msg_lower and "match" in error_msg_lower) or
-            "validation" in error_msg_lower or
-            "invalidresponseformat" in error_type.lower()):
-            return jsonify({
-                "error": "AI generated invalid PlantUML code. Please try rephrasing your request or try again."
-            }), 500
-        if "api key" in error_msg_lower or "invalid_api_key" in error_msg_lower or "authentication" in error_msg_lower:
-            return jsonify({
-                "error": "OpenAI API authentication failed. Please check your API key configuration."
-            }), 500
-
-        return jsonify({"error": error_msg or "An unexpected error occurred. Please try again."}), 500
+        return jsonify({"error": f"Server Error: {error_type}: {error_msg}"}), 500
 
 # Route handler for rendering PlantUML code directly (without OpenAI)
 def render_plantuml():
