@@ -1,6 +1,6 @@
 from flask import Flask, Blueprint, request, jsonify
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from dotenv import load_dotenv
 import zlib
 import base64
@@ -63,7 +63,7 @@ def handle_request():
             completion = client.beta.chat.completions.parse(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "You are a PlantUML expert. Always return valid PlantUML syntax."},
+                    {"role": "system", "content": "You are a PlantUML expert. Always return valid PlantUML syntax. Start your PlantUML code with @startuml and end with @enduml."},
                     {"role": "user", "content": f"Create a diagram for: {user_prompt}"}
                 ],
                 response_format=DiagramResponse,
@@ -84,6 +84,11 @@ def handle_request():
                 "plantuml_code": result.plantuml_code,
                 "explanation": result.explanation
             })
+        except ValidationError as validation_error:
+            # Handle Pydantic validation errors (when OpenAI response doesn't match schema)
+            return jsonify({
+                "error": "AI generated invalid PlantUML code that doesn't match the expected format. Please try rephrasing your request or try again."
+            }), 500
         except Exception as openai_error:
             # Handle OpenAI-specific errors more gracefully
             error_msg = str(openai_error)
