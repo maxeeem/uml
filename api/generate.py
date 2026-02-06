@@ -176,14 +176,12 @@ def render_plantuml():
 app = Flask(__name__)
 
 # Handle GET requests (shouldn't happen for API routes, but just in case)
-@app.route('/', methods=['GET'])
-def get_handler():
-    return jsonify({"error": "Method not allowed. Use POST."}), 405
-
-# Vercel routes both /api/generate and /api/render to this file
-# We check the request data to determine which handler to use
-@app.route('/', methods=['POST'])
-def vercel_router():
+@app.route('/', defaults={'path': ''}, methods=['GET', 'POST'])
+@app.route('/<path:path>', methods=['GET', 'POST'])
+def vercel_router(path):
+    if request.method == 'GET':
+        return jsonify({"error": "Method not allowed. Use POST."}), 405
+        
     data = request.json or {}
     # If request has plantuml_code but no prompt, it's a render request
     if 'plantuml_code' in data and 'prompt' not in data:
