@@ -1,8 +1,9 @@
 {
   "rewrites": [
     {
-      "source": "/api/(.*)",
+      "source": "/api/render",
       "destination": "/api/generate"
     }
-  ]
+  ],
+  "cleanUrls": true
 }
