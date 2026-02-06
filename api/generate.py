@@ -105,7 +105,7 @@ def handle_request():
             
             # Encode URL
             encoded = deflate_and_encode(result.plantuml_code)
-            url = f"http://www.plantuml.com/plantuml/svg/{encoded}"
+            url = f"https://www.plantuml.com/plantuml/svg/{encoded}"
 
             return jsonify({
                 "url": url, 
@@ -162,7 +162,7 @@ def render_plantuml():
 
         # Encode URL
         encoded = deflate_and_encode(plantuml_code)
-        url = f"http://www.plantuml.com/plantuml/svg/{encoded}"
+        url = f"https://www.plantuml.com/plantuml/svg/{encoded}"
 
         return jsonify({
             "url": url,
