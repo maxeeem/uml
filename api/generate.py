@@ -1,6 +1,5 @@
 from flask import Flask, Blueprint, request, jsonify
-from openai import OpenAI
-from openai import APIError
+from openai import OpenAI, APIError
 from pydantic import BaseModel, ValidationError
 from dotenv import load_dotenv
 import zlib
@@ -138,6 +137,16 @@ def handle_request():
     except Exception as e:
         # Handle other errors (like access code, missing prompt, etc.)
         error_msg = str(e)
+        error_type = type(e).__name__
+        
+        # Catch any remaining validation/pattern errors
+        if ("did not match the expected pattern" in error_msg.lower() or
+            "pattern" in error_msg.lower() and "match" in error_msg.lower() or
+            "validation" in error_msg.lower()):
+            return jsonify({
+                "error": "AI generated invalid PlantUML code. Please try rephrasing your request or try again."
+            }), 500
+        
         return jsonify({"error": error_msg}), 500
 
 # Route handler for rendering PlantUML code directly (without OpenAI)
