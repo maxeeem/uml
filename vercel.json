@@ -1,26 +1,17 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/generate.py",
-      "use": "@vercel/python"
+  "functions": {
+    "api/generate.py": {
+      "runtime": "python3.12"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/generate",
-      "dest": "api/generate.py"
+      "source": "/api/generate",
+      "destination": "/api/generate"
     },
     {
-      "src": "/api/render",
-      "dest": "api/generate.py"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/public/$1"
+      "source": "/api/render",
+      "destination": "/api/generate"
     }
   ]
 }
