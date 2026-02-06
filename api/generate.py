@@ -107,6 +107,11 @@ def render_plantuml():
 # For Vercel: route at / (Vercel routes /api/generate and /api/render to this file)
 app = Flask(__name__)
 
+# Handle GET requests (shouldn't happen for API routes, but just in case)
+@app.route('/', methods=['GET'])
+def get_handler():
+    return jsonify({"error": "Method not allowed. Use POST."}), 405
+
 # Vercel routes both /api/generate and /api/render to this file
 # We check the request data to determine which handler to use
 @app.route('/', methods=['POST'])
