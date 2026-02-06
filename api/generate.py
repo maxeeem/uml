@@ -1,24 +1,22 @@
 from flask import Flask, Blueprint, request, jsonify
 from openai import OpenAI, APIError
 from pydantic import BaseModel, ValidationError
-from dotenv import load_dotenv
 import zlib
 import base64
 import string
 import os
 from pathlib import Path
 
-# Load environment variables from .env file (for local development)
-# Try to load from project root (when run directly) or rely on app.py loading it first
-try:
-    project_root = Path(__file__).parent.parent
-    env_path = project_root / '.env'
-    if env_path.exists():
-        load_dotenv(dotenv_path=env_path, override=False)  # Don't override if already loaded
-except Exception:
-    pass  # If loading fails, assume env vars are already set (e.g., by app.py or Vercel)
-
-# Note: Vercel will use environment variables directly, so this won't interfere
+# Load .env only when NOT on Vercel (Vercel injects env vars directly)
+if not os.environ.get("VERCEL"):
+    try:
+        from dotenv import load_dotenv
+        project_root = Path(__file__).resolve().parent.parent
+        env_path = project_root / '.env'
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path)
+    except Exception:
+        pass
 
 # Create blueprint for the API
 api_bp = Blueprint('api', __name__)
@@ -148,19 +146,25 @@ def handle_request():
                 }), 500
 
     except Exception as e:
-        # Handle other errors (like access code, missing prompt, etc.)
+        # Handle other errors (access code, missing prompt, or any uncaught API/validation errors)
         error_msg = str(e)
+        error_msg_lower = error_msg.lower()
         error_type = type(e).__name__
-        
-        # Catch any remaining validation/pattern errors
-        if ("did not match the expected pattern" in error_msg.lower() or
-            "pattern" in error_msg.lower() and "match" in error_msg.lower() or
-            "validation" in error_msg.lower()):
+
+        # Never expose raw validation/pattern errors to the client
+        if ("did not match the expected pattern" in error_msg_lower or
+            ("pattern" in error_msg_lower and "match" in error_msg_lower) or
+            "validation" in error_msg_lower or
+            "invalidresponseformat" in error_type.lower()):
             return jsonify({
                 "error": "AI generated invalid PlantUML code. Please try rephrasing your request or try again."
             }), 500
-        
-        return jsonify({"error": error_msg}), 500
+        if "api key" in error_msg_lower or "invalid_api_key" in error_msg_lower or "authentication" in error_msg_lower:
+            return jsonify({
+                "error": "OpenAI API authentication failed. Please check your API key configuration."
+            }), 500
+
+        return jsonify({"error": error_msg or "An unexpected error occurred. Please try again."}), 500
 
 # Route handler for rendering PlantUML code directly (without OpenAI)
 def render_plantuml():

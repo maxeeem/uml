@@ -3,15 +3,15 @@ Local development server that serves both the Flask API and static files.
 Run this with: python app.py
 """
 from flask import Flask, send_from_directory
-from dotenv import load_dotenv
 from pathlib import Path
 import os
 
-# Load environment variables from .env file
-# Find the project root (where .env file is located)
-project_root = Path(__file__).parent
-env_path = project_root / '.env'
-load_dotenv(dotenv_path=env_path)
+# Load .env only when running locally (app.py is not used on Vercel)
+if not os.environ.get("VERCEL"):
+    from dotenv import load_dotenv
+    project_root = Path(__file__).resolve().parent
+    env_path = project_root / '.env'
+    load_dotenv(dotenv_path=env_path)
 
 # Import the API blueprint
 from api.generate import api_bp
