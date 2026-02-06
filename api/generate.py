@@ -6,20 +6,34 @@ import zlib
 import base64
 import string
 import os
+from pathlib import Path
 
 # Load environment variables from .env file (for local development)
+# Try to load from project root (when run directly) or rely on app.py loading it first
+try:
+    project_root = Path(__file__).parent.parent
+    env_path = project_root / '.env'
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path, override=False)  # Don't override if already loaded
+except Exception:
+    pass  # If loading fails, assume env vars are already set (e.g., by app.py or Vercel)
+
 # Note: Vercel will use environment variables directly, so this won't interfere
-load_dotenv()
 
 # Create blueprint for the API
 api_bp = Blueprint('api', __name__)
 
 # Initialize OpenAI
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+api_key = os.environ.get("OPENAI_API_KEY")
+if api_key:
+    api_key = api_key.strip()  # Remove any whitespace/newlines
+client = OpenAI(api_key=api_key)
 
 # Get the secret password from Vercel Environment Variables or .env file
 # For localhost: set this to None or empty string to disable access code check
 SECRET_ACCESS_CODE = os.environ.get("ACCESS_CODE")
+if SECRET_ACCESS_CODE:
+    SECRET_ACCESS_CODE = SECRET_ACCESS_CODE.strip()  # Remove any whitespace
 
 # --- Schema for Structured Output (No Chatter) ---
 class DiagramResponse(BaseModel):
@@ -53,7 +67,6 @@ def handle_request():
         if SECRET_ACCESS_CODE and SECRET_ACCESS_CODE.strip():
             if user_code != SECRET_ACCESS_CODE:
                 return jsonify({"error": "Incorrect Access Code. Please check your access code and try again."}), 403
-        # ----------------------
 
         if not user_prompt:
             return jsonify({"error": "No prompt provided"}), 400
