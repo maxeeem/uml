@@ -1,6 +1,27 @@
 {
-  "rewrites": [
-    { "source": "/api/render", "destination": "/api/generate" },
-    { "source": "/", "destination": "/index.html" }
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/generate.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/generate",
+      "dest": "api/generate.py"
+    },
+    {
+      "src": "/api/render",
+      "dest": "api/generate.py"
+    },
+    {
+      "src": "/",
+      "dest": "/public/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
   ]
 }
