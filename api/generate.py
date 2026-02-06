@@ -52,36 +52,62 @@ def handle_request():
         # For production (Vercel), set ACCESS_CODE to your secret password
         if SECRET_ACCESS_CODE and SECRET_ACCESS_CODE.strip():
             if user_code != SECRET_ACCESS_CODE:
-                return jsonify({"error": "Incorrect Access Code."}), 403
+                return jsonify({"error": "Incorrect Access Code. Please check your access code and try again."}), 403
         # ----------------------
 
         if not user_prompt:
             return jsonify({"error": "No prompt provided"}), 400
 
         # Call OpenAI with Structured Outputs
-        completion = client.beta.chat.completions.parse(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a PlantUML expert."},
-                {"role": "user", "content": f"Create a diagram for: {user_prompt}"}
-            ],
-            response_format=DiagramResponse,
-        )
+        try:
+            completion = client.beta.chat.completions.parse(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a PlantUML expert. Always return valid PlantUML syntax."},
+                    {"role": "user", "content": f"Create a diagram for: {user_prompt}"}
+                ],
+                response_format=DiagramResponse,
+            )
 
-        result = completion.choices[0].message.parsed
-        
-        # Encode URL
-        encoded = deflate_and_encode(result.plantuml_code)
-        url = f"http://www.plantuml.com/plantuml/svg/{encoded}"
+            result = completion.choices[0].message.parsed
+            
+            # Validate that we got valid PlantUML code
+            if not result.plantuml_code or not result.plantuml_code.strip():
+                return jsonify({"error": "AI did not generate valid PlantUML code. Please try again."}), 500
+            
+            # Encode URL
+            encoded = deflate_and_encode(result.plantuml_code)
+            url = f"http://www.plantuml.com/plantuml/svg/{encoded}"
 
-        return jsonify({
-            "url": url, 
-            "plantuml_code": result.plantuml_code,
-            "explanation": result.explanation
-        })
+            return jsonify({
+                "url": url, 
+                "plantuml_code": result.plantuml_code,
+                "explanation": result.explanation
+            })
+        except Exception as openai_error:
+            # Handle OpenAI-specific errors more gracefully
+            error_msg = str(openai_error)
+            if "did not match the expected pattern" in error_msg or "validation" in error_msg.lower():
+                return jsonify({
+                    "error": "AI generated invalid PlantUML code. Please try rephrasing your request or try again."
+                }), 500
+            elif "rate limit" in error_msg.lower():
+                return jsonify({
+                    "error": "OpenAI API rate limit exceeded. Please wait a moment and try again."
+                }), 429
+            elif "api key" in error_msg.lower() or "authentication" in error_msg.lower():
+                return jsonify({
+                    "error": "OpenAI API authentication failed. Please check your API key configuration."
+                }), 500
+            else:
+                return jsonify({
+                    "error": f"OpenAI API error: {error_msg}"
+                }), 500
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Handle other errors (like access code, missing prompt, etc.)
+        error_msg = str(e)
+        return jsonify({"error": error_msg}), 500
 
 # Route handler for rendering PlantUML code directly (without OpenAI)
 def render_plantuml():
