@@ -1,12 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/generate",
-      "destination": "/api/generate.py"
-    },
-    {
       "source": "/api/render",
-      "destination": "/api/generate.py"
+      "destination": "/api/generate"
     }
   ]
 }
