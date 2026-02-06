@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Diagram Generator</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        textarea { width: 100%; height: 100px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: inherit; }
+        #plantuml-code { font-family: 'Monaco', 'Menlo', 'Courier New', monospace; font-size: 13px; line-height: 1.5; }
+        input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; width: 200px; margin-top: 10px; }
+        button { background: #0070f3; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-left: 10px; }
+        button:disabled { background: #ccc; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover:not(:disabled) { background: #5a6268; }
+        #result { margin-top: 20px; }
+        .code-section { margin-top: 20px; }
+        .code-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .code-header h3 { margin: 0; font-size: 16px; }
+        img { max-width: 100%; border: 1px solid #eee; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .error { color: #d00; background: #fff0f0; padding: 10px; border-radius: 5px; border: 1px solid #ffcccc; }
+        .note { color: #666; font-style: italic; margin-bottom: 10px; display: block; }
+        .diagram-section { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Text to Diagram</h1>
+    <p>Describe your system below:</p>
+    
+    <textarea id="prompt" placeholder="e.g. A library system with Books, Users, and Loans..."></textarea>
+    
+    <div style="margin-top: 10px;">
+        <input type="password" id="accessCode" placeholder="Access Code (optional for localhost)">
+        <button onclick="generate()" id="btn">Generate</button>
+    </div>
+
+    <div id="result"></div>
+
+    <script>
+        async function generate() {
+            const prompt = document.getElementById('prompt').value;
+            const accessCode = document.getElementById('accessCode').value;
+            const btn = document.getElementById('btn');
+            const resultDiv = document.getElementById('result');
+
+            if (!prompt) {
+                alert("Please enter a description");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = "Generating...";
+            resultDiv.innerHTML = "";
+
+            try {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, accessCode })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || "Server Error");
+                }
+
+                displayResult(data);
+            } catch (err) {
+                resultDiv.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Generate";
+            }
+        }
+
+        async function redraw() {
+            const plantumlCode = document.getElementById('plantuml-code').value;
+            const redrawBtn = document.getElementById('redraw-btn');
+            const resultDiv = document.getElementById('result');
+            const diagramSection = document.getElementById('diagram-section');
+
+            if (!plantumlCode.trim()) {
+                alert("Please enter PlantUML code");
+                return;
+            }
+
+            redrawBtn.disabled = true;
+            redrawBtn.innerText = "Rendering...";
+
+            try {
+                const res = await fetch('/api/render', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plantuml_code: plantumlCode })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || "Server Error");
+                }
+
+                // Update the diagram
+                if (diagramSection) {
+                    diagramSection.innerHTML = `<img src="${data.url}" alt="Diagram" />`;
+                }
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            } finally {
+                redrawBtn.disabled = false;
+                redrawBtn.innerText = "Redraw Diagram";
+            }
+        }
+
+        function displayResult(data) {
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.innerHTML = `
+                ${data.explanation ? `<span class="note"><strong>AI Explanation:</strong> ${data.explanation}</span>` : ''}
+                
+                <div class="code-section">
+                    <div class="code-header">
+                        <h3>PlantUML Code</h3>
+                        <button onclick="redraw()" id="redraw-btn" class="btn-secondary">Redraw Diagram</button>
+                    </div>
+                    <textarea id="plantuml-code" rows="15" placeholder="PlantUML code will appear here...">${data.plantuml_code || ''}</textarea>
+                </div>
+
+                <div class="diagram-section" id="diagram-section">
+                    <img src="${data.url}" alt="Diagram" />
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
